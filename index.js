@@ -1,21 +1,38 @@
 var express = require('express');
 var React = require('react');
 const fs = require('fs');
+const bodyParser = require('body-parser');
 //mongod --dbpath="G:\Frank\data\db"
-var app = express()
-const MongoClient = require('mongodb').MongoClient
-const url = 'mongodb://127.0.0.1:27017'
-const dbName = 'webappbb'
-let db
+var app = express();
+const MongoClient = require('mongodb').MongoClient;
+const url = 'mongodb://127.0.0.1:27017';
+const dbName = 'webappbb';
+let db;
+app.use(bodyParser.urlencoded({extended: true}));
 
 function generateCollectionList(collInfos) {
-    listOfCollections = "";
+    let listOfCollections = "";
     for (let step = 0; step < collInfos.length; step++) {
-        temp = "<li class=fancy-box><a class=fancy-heading href=\"http://localhost:8081/record?name=todo\">todo</a></li> ";
+        let temp = "<li class=fancy-box><a class=fancy-heading href=\"http://localhost:8081/record?name=todo\">todo</a></li> ";
         temp = temp.split("todo").join(collInfos[step].name);
         listOfCollections += temp;
     }
     return listOfCollections;
+}
+
+function generateStoryList(recordInfo, collectionName) {
+	let listOfRecords = "<a class=fancy-heading href=\"http://localhost:8081/addrecord?coll=" + collectionName + "\">Add to Record</a> ";
+	let name = "name=todo&";
+	let coll = "coll=" + collectionName;
+	for (let step = 0; step < recordInfo.length; step++) {
+        let recordName = recordInfo[step].name;
+        listOfRecords += "<li class=fancy-box><a class=fancy-heading href=\"http://localhost:8081/story?" + name.replace("todo", recordName) + coll + "\">" + recordName + "</a></li> ";
+	}
+	return listOfRecords;
+}
+
+function generateStoryPage(body, storyName) {
+    
 }
 
 app.get('/', function(req, res) {
@@ -48,15 +65,68 @@ app.get('/collections', function(req, res) {
 })
 
 app.get('/record', function(req, res){
-    nameOfCollection = req.query.name;
     fs.readFile('G:/Frank/Website Project/templates/record.html', 'utf8', function(err, data) {
         if (err) {
             return console.log(err);
         } else {
-            
+            MongoClient.connect(url, {useNewUrlParser: true}, (error, client) => {
+            	if (error) {
+            		return console.log(error);
+            	} else {
+            		db = client.db(dbName);
+            		db.collection(req.query.name).find({}).toArray(function(error2, recordInfo){
+            			if (error2) {
+            				return console.log(error2)
+            			} else {
+            				res.send(data.replace("<todo></todo>", generateStoryList(recordInfo, req.query.name)));
+            			}
+            		})
+            	}
+            });
+        }
+    });
+})
+
+app.get('/addrecord', function(req, res) {
+    console.log(req.query.coll);
+    fs.readFile('G:/Frank/Website Project/templates/addtorecord.html', 'utf8', function(err, data) {
+        if (err) {
+            return console.log(err)
+        } else {
+            res.send(data.replace("todo", req.query.coll))
         }
     })
 })
+
+app.get('/save', function(req, res) {
+    fs.readFile("G:/Frank/Website Project/templates/home.html", 'utf8', function(err, data){
+        if (err) {
+            return console.log(err);
+        } else {
+            body = {name: req.query.recordName, body: req.query.recordText};
+            MongoClient.connect(url, {useNewUrlParser: true}, (error, client) => {
+                if (error) {
+                    return console.log(error);
+                } else {
+                    db = client.db(dbName);
+                    db.collection(req.query.coll).insertOne(body, function(insErr, res) {
+                        if (insErr) {
+                            console.log(insErr);
+                        } else {
+                            console.log("1 document inserted");
+                            res.send(data);
+                        }
+                    })
+                }
+            });
+        }
+    });
+})
+
+app.get('/story', function(req, res){
+
+})
+
 
 var server = app.listen(8081, function(){
     var host = server.address().address
@@ -65,19 +135,3 @@ var server = app.listen(8081, function(){
 })
 
 console.log('Server has started');
-
-// function onRequest(request, response) {
-// 	MongoClient.connect(url, {useNewUrlParser: true}, (err, client) => {
-//     if (err) {
-//         return console.log(err)
-//     } else {
-//         db = client.db(dbName)
-//         console.log('Connected MongoDB: ' + url)
-//         console.log('Database: ' + dbName)
-//         response.writeHead(200);
-//     //response.write('<html><head></head><body>' + list + '</body>');
-//     response.write(ReactDOMServer.renderToString(<Hello />))
-// 		response.end();
-//     }
-// })
-// }
