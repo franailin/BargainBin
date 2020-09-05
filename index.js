@@ -5,6 +5,7 @@ const bodyParser = require('body-parser');
 //mongod --dbpath="G:\Frank\data\db"
 var app = express();
 const MongoClient = require('mongodb').MongoClient;
+const ObjectID = require('mongodb').ObjectID;
 const url = 'mongodb://127.0.0.1:27017';
 const dbName = 'webappbb';
 let db;
@@ -22,17 +23,18 @@ function generateCollectionList(collInfos) {
 
 function generateStoryList(recordInfo, collectionName) {
 	let listOfRecords = "<a class=fancy-heading href=\"http://localhost:8081/addrecord?coll=" + collectionName + "\">Add to Record</a> ";
-	let name = "name=todo&";
+	let id = "id=todo&";
 	let coll = "coll=" + collectionName;
 	for (let step = 0; step < recordInfo.length; step++) {
         let recordName = recordInfo[step].name;
-        listOfRecords += "<li class=fancy-box><a class=fancy-heading href=\"http://localhost:8081/story?" + name.replace("todo", recordName) + coll + "\">" + recordName + "</a></li> ";
+        let recordID = recordInfo[step]._id.toString();
+        listOfRecords += "<li class=fancy-box><a class=fancy-heading href=\"http://localhost:8081/story?" + id.replace("todo", recordID) + coll + "\">" + recordName + "</a></li> ";
 	}
 	return listOfRecords;
 }
 
 function generateStoryPage(body, storyName) {
-    
+    return "<h1>" + storyName + "</h1><br><p>" + body + "</p>";
 }
 
 app.get('/', function(req, res) {
@@ -109,7 +111,7 @@ app.get('/save', function(req, res) {
                     return console.log(error);
                 } else {
                     db = client.db(dbName);
-                    db.collection(req.query.coll).insertOne(body, function(insErr, res) {
+                    db.collection(req.query.coll).insertOne(body, function(insErr, doc) {
                         if (insErr) {
                             console.log(insErr);
                         } else {
@@ -124,9 +126,36 @@ app.get('/save', function(req, res) {
 })
 
 app.get('/story', function(req, res){
-
+    var id = req.query.id;
+    var coll = req.query.coll;
+    console.log(id);
+    console.log(coll);
+    fs.readFile("G:/Frank/Website Project/templates/record.html", 'utf8', function(err, data){
+        if (err) {
+            return console.log(err);
+        } else {
+            MongoClient.connect(url, {useNewUrlParser: true}, (error, client) => {
+                if (error) {
+                    console.log(error);
+                } else {
+                    db = client.db(dbName);
+                    db.collection(coll).findOne({_id: ObjectID.createFromHexString(id)}, function(err2, result) {
+                        if (err2) {
+                            console.log(err2);
+                        } else {
+                            console.log(result);
+                            res.send(data.replace("<todo></todo>", generateStoryPage(result.body, result.name)));
+                        }
+                    });
+                }
+            });
+        }
+    });
 })
 
+app.get('/about', function(req, res){
+
+});
 
 var server = app.listen(8081, function(){
     var host = server.address().address
